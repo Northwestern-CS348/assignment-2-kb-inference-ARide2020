@@ -116,6 +116,47 @@ class KnowledgeBase(object):
             print("Invalid ask:", fact.statement)
             return []
 
+    def kb_delete(self, fact_or_rule):
+
+        if(len(fact_or_rule.supported_by) != 0):
+            if(fact_or_rule.asserted):
+                fact_or_rule.asserted = False #dont remember why maybe matty remebers
+            return
+
+        if isinstance(fact_or_rule, Fact) and fact_or_rule in self.facts:
+            if(len(fact_or_rule.supports_facts) != 0):                
+                for sf in fact_or_rule.supports_facts:
+                    for pair in sf.supported_by:
+                        if pair[0] == fact_or_rule:
+                            sf.supported_by.remove(pair)
+                    if(len(sf.supported_by) == 0) and not sf.asserted:
+                        self.kb_delete(sf)
+            if(len(fact_or_rule.supports_rules) != 0):            
+                for sr in fact_or_rule.supports_rules:
+                    for pair in sr.supported_by:
+                        if pair[0] == fact_or_rule:
+                            sr.supported_by.remove(pair)
+                    if(len(sr.supported_by) == 0) and not sr.asserted:
+                        self.kb_delete(sr)
+            self.facts.remove(fact_or_rule)
+
+        if isinstance(fact_or_rule, Rule) and fact_or_rule in self.rules:
+            if(len(fact_or_rule.supports_facts) != 0):                
+                for sf in fact_or_rule.supports_facts:
+                    for pair in sf.supported_by:
+                        if pair[1] == fact_or_rule:
+                            sf.supported_by.remove(pair)
+                    if(len(sf.supported_by) == 0) and not sf.asserted:
+                        self.kb_delete(sf)
+            if(len(fact_or_rule.supports_rules) != 0):            
+                for sr in fact_or_rule.supports_rules:
+                    for pair in sr.supported_by:
+                        if pair[1] == fact_or_rule:
+                            sr.supported_by.remove(pair)
+                    if(len(sr.supported_by) == 0) and not sr.asserted:
+                        self.kb_delete(sr)
+            self.rules.remove(fact_or_rule)
+
     def kb_retract(self, fact_or_rule):
         """Retract a fact from the KB
 
@@ -128,7 +169,11 @@ class KnowledgeBase(object):
         printv("Retracting {!r}", 0, verbose, [fact_or_rule])
         ####################################################
         # Student code goes here
+        if isinstance(fact_or_rule,Fact):
+            if fact_or_rule in self.facts:
+             self.kb_delete(self._get_fact(fact_or_rule))
         
+    
 
 class InferenceEngine(object):
     def fc_infer(self, fact, rule, kb):
@@ -146,3 +191,35 @@ class InferenceEngine(object):
             [fact.statement, rule.lhs, rule.rhs])
         ####################################################
         # Student code goes here
+        binds = match(rule.lhs[0], fact.statement)
+
+        if binds != False:
+            if (len(rule.lhs) == 1):
+                newf = instantiate(rule.rhs,binds)
+
+                f = Fact(newf,[[fact,rule]])
+
+                kb.kb_add(f)
+
+                f = kb._get_fact(f)
+
+                rule.supports_facts.append(f)
+                fact.supports_facts.append(f)
+            else:
+                #for rule there is more than one lhs so you have to instantiate all of them and the rhs
+                lstofstants = []
+                for l in rule.lhs[1:]:
+                    lstofstants.append(instantiate(l,binds))
+                
+                #lstofstants.remove(lstofstants[0])
+
+                rhstant = instantiate(rule.rhs, binds)
+                
+                newr = Rule([lstofstants,rhstant],[[fact,rule]])
+                
+                kb.kb_add(newr)
+
+                r = kb._get_rule(newr)
+
+                rule.supports_rules.append(r)
+                fact.supports_rules.append(r)
